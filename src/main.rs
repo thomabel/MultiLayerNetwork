@@ -44,15 +44,19 @@ fn read_input() -> Result<Array1<Input>, &'static str> {
         "./data/mnist_train.csv",
         "./data/mnist_test.csv",
     ];
-    let input: Vec<data::Input>;
-    let temp = read::read(path[path_index]);
+    let input;
+    let inputs = INPUT;
+    let dividend = DIVIDE;
+    let temp
+        = read::read_image(path[path_index], inputs, dividend);
+
     match temp {
         Ok(v) => {
             input = v;
             println!("SUCCESS: Data read");
-            Ok(Array1::<data::Input>::from_vec(input))
+            Ok(Array1::<Input>::from_vec(input))
         }
-        Err(e) => {
+        Err(_e) => {
             let str = "Could not read.";
             Err(str)
         }
