@@ -8,10 +8,11 @@ pub const MOMENTUM: f32 = 0.9;
 pub const EPOCH: usize = 100;
 
 // Array sizes
-pub const BATCHES: usize = 10;
-pub const INPUT: usize = 784;
-pub const HIDDEN: usize = 5;
-pub const OUTPUT: usize = 3;
+pub const BATCHES: usize = 1;
+//pub const INPUT: usize = 784;
+pub const INPUT: usize = 2;
+pub const HIDDEN: usize = 2;
+pub const OUTPUT: usize = 1;
 
 // Current target values
 pub const TARGET: [char; 10] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];

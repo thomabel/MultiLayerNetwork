@@ -8,11 +8,10 @@
 */
 mod constants;
 mod data;
-mod neural_network;
+mod network;
 mod print_data;
 mod read;
-mod network;
-mod propogation;
+
 use constants::*;
 use data::Input;
 use ndarray::prelude::*;
@@ -20,7 +19,7 @@ use ndarray::prelude::*;
 
 // MAIN
 fn main() {
-    let result = read_input();
+    let result = read_toy_input();
     let input;
     match result {
         Ok(o) => {
@@ -34,7 +33,24 @@ fn main() {
     gradient_descent(&input);
 }
 
-fn read_input() -> Result<Array1<Input>, &'static str> {
+fn read_toy_input() -> Result<(Array2<f32>, Array1<f32>), &'static str> {
+    // Read file for data.
+    println!("Reading data, please be patient...");
+    let path = "./data/test.csv";
+    let input = read::read_toy(path, 2);
+    match input {
+        Ok(v) => {
+            println!("SUCCESS: Data read");
+            Ok(v)
+        }
+        Err(_e) => {
+            let str = "Could not read.";
+            Err(str)
+        }
+    }
+}
+
+fn read_image_input() -> Result<Array1<Input>, &'static str> {
     // Read file for data.
     println!("Reading data, please be patient...");
     let path_index = 1;
@@ -44,7 +60,6 @@ fn read_input() -> Result<Array1<Input>, &'static str> {
         "./data/mnist_train.csv",
         "./data/mnist_test.csv",
     ];
-    let input;
     let inputs = INPUT;
     let dividend = DIVIDE;
     let temp
@@ -52,9 +67,8 @@ fn read_input() -> Result<Array1<Input>, &'static str> {
 
     match temp {
         Ok(v) => {
-            input = v;
             println!("SUCCESS: Data read");
-            Ok(Array1::<Input>::from_vec(input))
+            Ok(Array1::<Input>::from_vec(v))
         }
         Err(_e) => {
             let str = "Could not read.";
@@ -63,30 +77,30 @@ fn read_input() -> Result<Array1<Input>, &'static str> {
     }
 }
 
-fn gradient_descent(input: &Array1<Input>) {
+
+
+fn gradient_descent(input: &(Array2<f32>, Array1<f32>)) {
     println!("Performing gradient descent...");
     // Goes Output, Input
-    // Add +1 for bias at the end
+    // Add +1 on input for bias at the end
     // Currently on 2 layers
     let sizes = vec![
-    network::LayerSize::new(HIDDEN, INPUT + 1),
-    network::LayerSize::new(OUTPUT, HIDDEN + 1)];
-    
-    let mut network = network::Network::new(&sizes, BATCHES);
-    let mut batch = 0;
+    network::LayerSize::new(HIDDEN, INPUT + 1, BATCHES),
+    network::LayerSize::new(OUTPUT, HIDDEN + 1, BATCHES)];
+    let mut network = network::Network::new(&sizes);
+    network.set_weights(0.1);
+
     let mut total = 0;
-    for i in input {
+    for i in input.0.rows() {
         total += 1;
-        println!("BATCH: {}, INPUT: {}", batch, total);
-        propogation::forward(&mut network, &i.data.view(), batch);
+        println!("BATCH: {}, INPUT: {}", network.batch, total);
+        network.forward(&i);
         println!();
 
-        // Track number in batch of inputs.
-        if batch >= BATCHES - 1 {
-            batch = 0;
-        }
-        else {
-            batch += 1;
+        network.batch += 1;
+        if network.batch == BATCHES {
+            // Do backprop
+            network.batch = 0;
         }
     }
 
