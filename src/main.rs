@@ -7,13 +7,12 @@
     Class: Machine Learning
 */
 mod constants;
-mod data;
+mod layer;
 mod network;
 mod print_data;
 mod read;
 
 use constants::*;
-use data::Input;
 use ndarray::prelude::*;
 
 
@@ -50,7 +49,7 @@ fn read_toy_input() -> Result<(Array2<f32>, Array1<f32>), &'static str> {
     }
 }
 
-fn read_image_input() -> Result<Array1<Input>, &'static str> {
+/* fn read_image_input() -> Result<Array1<Input>, &'static str> {
     // Read file for data.
     println!("Reading data, please be patient...");
     let path_index = 1;
@@ -76,7 +75,7 @@ fn read_image_input() -> Result<Array1<Input>, &'static str> {
         }
     }
 }
-
+*/
 
 
 fn gradient_descent(input: &(Array2<f32>, Array1<f32>)) {
@@ -85,9 +84,10 @@ fn gradient_descent(input: &(Array2<f32>, Array1<f32>)) {
     // Add +1 on input for bias at the end
     // Currently on 2 layers
     let sizes = vec![
-    network::LayerSize::new(HIDDEN, INPUT + 1, BATCHES),
-    network::LayerSize::new(OUTPUT, HIDDEN + 1, BATCHES)];
-    let mut network = network::Network::new(&sizes);
+        layer::LayerSize::new(HIDDEN, INPUT + 1, BATCHES),
+        layer::LayerSize::new(OUTPUT, HIDDEN + 1, BATCHES)
+    ];
+    let mut network = network::Network::new(&sizes, RATE, MOMENTUM);
     network.set_weights(0.1);
 
     let mut total = 0;
@@ -99,9 +99,13 @@ fn gradient_descent(input: &(Array2<f32>, Array1<f32>)) {
         network.batch += 1;
         if network.batch == BATCHES {
             // Do backprop
-            network.backward(&input.1);
+            let start = total - BATCHES;
+            let end = total;
+            network.find_error(&input.1.slice(s![start..end]));
+            network.update_weights(&input.0.slice(s![start..end, ..]));
             network.batch = 0;
         }
+        println!();
     }
 
     println!("\nEnding training.");

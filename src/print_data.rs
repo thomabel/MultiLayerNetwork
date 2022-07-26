@@ -1,12 +1,11 @@
 // Printing functions for debugging
-use crate::{constants::*, data::{Outcome, Correctness}};
 use ndarray::prelude::*;
-
+/* 
 pub fn _print_outcome(outcome: &Array1<Outcome>) {
     // Check our work.
     let mut correct = 0;
     let total = BATCHES as i32;
-
+    
     println!("Target values:");
     for c in outcome {
         print!("{}, ", c.target);
@@ -20,6 +19,7 @@ pub fn _print_outcome(outcome: &Array1<Outcome>) {
     }
     _print_total_error(correct, total);
 }
+*/
 
 pub fn _percentage(num: i32, denom: i32) -> String {
     let per = num as f64 / denom as f64 * 100.0;
