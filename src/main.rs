@@ -80,7 +80,7 @@ fn read_image_input() -> Result<Array1<Input>, &'static str> {
 
 
 fn gradient_descent(input: &(Array2<f32>, Array1<f32>)) {
-    println!("Performing gradient descent...");
+    println!("Performing gradient descent... \n");
     // Goes Output, Input
     // Add +1 on input for bias at the end
     // Currently on 2 layers
@@ -93,13 +93,13 @@ fn gradient_descent(input: &(Array2<f32>, Array1<f32>)) {
     let mut total = 0;
     for i in input.0.rows() {
         total += 1;
-        println!("BATCH: {}, INPUT: {}", network.batch, total);
+        println!("=== BATCH: {}, INPUT: {} ===", network.batch, total);
         network.forward(&i);
-        println!();
 
         network.batch += 1;
         if network.batch == BATCHES {
             // Do backprop
+            network.backward(&input.1);
             network.batch = 0;
         }
     }

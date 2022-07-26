@@ -42,6 +42,7 @@ impl Network {
         let mut input;
 
         // Feed forward the initial input layer.
+        println!("Forward: ");
         print!("Initial: ");
         layer_prev.feed_forward(target, self.batch);
 
@@ -52,21 +53,35 @@ impl Network {
             layer.feed_forward(&input, self.batch);
             layer_prev = layer;
         }
+        println!();
     }
 
-    pub fn backward(&mut self, target: f32) {
+    pub fn backward(&mut self, target: &Array1<f32>) {
         let mut iter = self.layers.iter_mut().rev();
         let mut layer_prev = iter.next().unwrap();
         //let mut input;
 
-        // Feed backward through the output layer.
+        // Find all error values.
+        println!("Backward: ");
         print!("Output: ");
-
-        // Feed it through every other layer.
+        layer_prev.find_error_output(target);
+        println!();
         for layer in iter {
             print!("Layer: ");
-
+            layer.find_error_layer(layer_prev);
+            println!();
+            layer_prev = layer;
         }
+
+        // Reset iterator
+        iter = self.layers.iter_mut().rev();
+        layer_prev = iter.next().unwrap();
+
+        // Feed backward through the output layer.
+        // Feed it through every other layer.
+        for layer in iter {
+        }
+        println!();
     }
     
 }
@@ -74,26 +89,32 @@ impl Network {
 pub struct Layer {
     pub outputs:     usize,
     pub inputs:      usize,
+    pub batches:     usize,
     pub weight:      Array2<f32>,
     pub weight_last: Array2<f32>,
     pub result:      Array2<f32>,
+    pub error:       Array2<f32>,
 }
 impl Layer {
     // Constructors
     fn new(size: &LayerSize) -> Layer {
-        let weights 
+        let weight 
             = Array2::<f32>::zeros((size.outputs, size.inputs));
-        let weights_last 
+        let weight_last 
             = Array2::<f32>::zeros((size.outputs, size.inputs));
-        let results 
+        let result 
+            = Array2::<f32>::zeros((size.outputs, size.batches));
+        let error
             = Array2::<f32>::zeros((size.outputs, size.batches));
         
         Layer{ 
             outputs: size.outputs, 
             inputs: size.inputs, 
-            weight: weights, 
-            weight_last: weights_last, 
-            result: results 
+            batches: size.batches,
+            weight, 
+            weight_last, 
+            result, 
+            error
         }
     }
     fn set_weights(&mut self, weight: f32) {
@@ -137,6 +158,32 @@ impl Layer {
             print!("{:.3}, ", solution);
         }
         println!();
+    }
+
+    // Error functions
+    fn find_error_output(&mut self, target: &Array1<f32>) {
+        for node in 0..self.outputs {     
+            for batch in 0..self.batches {
+                let input = self.result[[node, batch]];
+                let factor = target[batch] - input;
+                let error = Layer::sigmoid_derivative(input, factor);
+                self.error[[node, batch]] = error;
+                print!("{:.3}, ", error);
+            }
+        }
+    }
+    fn find_error_layer(&mut self, layer_prev: &Layer) {
+        for hidden in 0..self.outputs {
+            for batch in 0..self.batches {
+                let input = self.result[[hidden, batch]];
+                let col_w = &layer_prev.weight.column(hidden);
+                let col_e = &layer_prev.error.column(batch);
+                let factor = col_w.dot(col_e);
+                let error = Layer::sigmoid_derivative(input, factor);
+                self.error[[hidden, batch]] = error;
+                print!("{:.3}, ", error);
+            }
+        }
     }
 
     // 
