@@ -3,7 +3,7 @@
 pub const DIVIDE: f32 = 255.0;
 pub const LOW: f32 = -0.05;
 pub const HIGH: f32 = 0.05;
-pub const RATE: f32 = 0.1;
+pub const RATE: f32 = 0.2;
 pub const MOMENTUM: f32 = 0.9;
 pub const EPOCH: usize = 100;
 

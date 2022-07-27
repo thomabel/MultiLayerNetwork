@@ -138,10 +138,12 @@ impl Layer {
                 }
                 // Weight update
                 let weight = &mut self.weight[[j, i]];
-                let delta = learning_rate * row_i.dot(&row_e) / batch_size;
+                let error = row_i.dot(&row_e) / batch_size;
+                let delta = learning_rate * error;
                 let momentum = self.weight_last[[j, i]] * momentum_rate;
                 *weight += delta + momentum;
-                print!("{:.4}, ", *weight);
+                print!("{:.4} * {:.4} + {:.4} * {:.4} = ", learning_rate, error, momentum_rate, self.weight_last[[j, i]]);
+                println!("{:.4}, ", *weight);
             }
 
             // Bias weight update
