@@ -19,7 +19,7 @@ use network::Network;
 
 // MAIN
 fn main() {
-    let path_index = 1;
+    let path_index = 2;
     let path = [
         "./data/test.csv",
         "./data/mnist_test - Copy.csv",

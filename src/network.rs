@@ -40,18 +40,21 @@ impl Network {
     pub fn gradient_descent(&mut self, input: &(Array2<f32>, Array1<f32>)) {
         let mut batch = 0;
         let mut total = 0;
+        let mut correct: u32 = 0;
         for i in input.0.rows() {
-            println!("=== BATCH: {}, INPUT: {}, TOTAL: {} ===", 
-                        batch + 1, self.batch + 1, total + 1);
+            println!("=== BATCH: {}, INPUT: {}, TOTAL: {} ===", batch + 1, self.batch + 1, total + 1);
 
+            // Forward Propogation
             self.forward(&i);
+            /* 
             for layer in &self.layers {
                 _print_matrix(&layer.result, "RESULT");
             }
+            */
             self.batch += 1;
             total += 1;
 
-            // Do back propogation
+            // Backward propogation
             if self.batch == self.batch_size {
                 // For slicing the array over the bach.
                 let start = total - self.batch_size;
@@ -60,11 +63,21 @@ impl Network {
                 // Slice the arrays and classify targets
                 let target = &input.1.slice(s![start..end]);
                 let result = &self.layers.last().unwrap().result;
-                let target_class = Network::classify_targets(target, result, true);
+                let target_class = Network::classify_targets(target, result);
                 let slice = &input.0.slice(s![start..end, ..]);
 
+                _print_vector(target, "TARGET");
+                _print_vector(&target_class.1.view(), "PREDICT");
+
+                for t in 0..target.len() {
+                    if target[t] == target_class.1[t] {
+                        correct += 1;
+                    }
+                }
+                _print_total_error(correct, total as u32);
+
                 // Get the error and update the weights.
-                self.find_error(&target_class.view());
+                self.find_error(&target_class.0.view());
                 self.update_weights(slice);
                 
                 // Update counter variables.
@@ -93,8 +106,9 @@ impl Network {
     }
 
     // Classify targets as either 0.9 or 0.1 for backprop.
-    fn classify_targets(target: &ArrayView1<f32>, result: &Array2<f32>, print: bool) -> Array1<f32> {
-        let mut out = Array1::<f32>::zeros(target.len());
+    fn classify_targets(target: &ArrayView1<f32>, result: &Array2<f32>) -> (Array1<f32>, Array1<f32>) {
+        let mut target_weight = Array1::<f32>::zeros(target.len());
+        let mut prediction = Array1::<f32>::zeros(target.len());
 
         // Cycle through all target values in batch.
         for t in 0..target.len() {
@@ -107,14 +121,10 @@ impl Network {
                 }
             }
             index -= 1;
-            out[t] = if target[t] == index as f32 { 0.9 } else { 0.1 };
-            if print { 
-                print!("{} = {} ", target[t], index); 
-                //print!("w = {}, ", out[t]);
-            }
+            target_weight[t] = if target[t] == index as f32 { 0.9 } else { 0.1 };
+            prediction[t] = index as f32;
         }
-        if print { println!("\n"); }
-        out
+        (target_weight, prediction)
     }
 
     // Finds the error values given each output.
