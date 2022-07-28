@@ -19,7 +19,7 @@ use network::Network;
 
 // MAIN
 fn main() {
-    let path_index = 0;
+    let path_index = 1;
     let path = [
         "./data/test.csv",
         "./data/mnist_test - Copy.csv",
@@ -30,7 +30,8 @@ fn main() {
     let result = read_file(path[path_index]);
     let input;
     match result {
-        Ok(o) => {
+        Ok(mut o) => {
+            o.0 /= DIVIDE;
             input = o;
         },
         Err(e) => {
@@ -38,6 +39,7 @@ fn main() {
             return;
         }
     }
+    //_print_matrix(&input.0, "Input");
     let _n = gradient_descent(&input);
     // Use network from here to test data.
 }
@@ -68,7 +70,8 @@ fn gradient_descent(input: &(Array2<f32>, Array1<f32>)) -> Network {
         layer::LayerSize::new(OUTPUT, HIDDEN, BATCHES)
     ];
     let mut network = Network::new(&sizes, RATE, MOMENTUM, BATCHES);
-    network.set_weights(0.1);
+    //network.weight_set(0.1);
+    network.weight_randomize(LOW, HIGH);
     network.gradient_descent(input);
     println!("\nEnding training.");
     network

@@ -1,7 +1,6 @@
 use ndarray::prelude::*;
 use ndarray_rand::rand_distr::Distribution;
 use rand::distributions::Uniform;
-use crate::constants::*;
 
 #[derive(Clone, Copy)]
 pub struct LayerSize {
@@ -16,11 +15,11 @@ impl LayerSize {
 }
 
 pub struct Layer {
-    pub size:       LayerSize,
-    pub weight:      Array2<f32>,
-    pub weight_last: Array2<f32>,
-    pub result:      Array2<f32>,
-    pub error:       Array2<f32>,
+    pub size:        LayerSize,         // Sizes
+    pub weight:      Array2<f32>,       // [output, input + 1]
+    pub weight_last: Array2<f32>,       // [output, input + 1]
+    pub result:      Array2<f32>,       // [output + 1, batch]
+    pub error:       Array2<f32>,       // [output, batch]
 }
 impl Layer {
     // Constructors
@@ -46,13 +45,13 @@ impl Layer {
             error
         }
     }
-    pub fn set_weights(&mut self, weight: f32) {
+    pub fn _weight_set(&mut self, weight: f32) {
         for w in &mut self.weight {
             *w = weight;
         }
     }
-    pub fn randomize_weights(&mut self) {
-        let between = Uniform::from(LOW..HIGH);
+    pub fn weight_randomize(&mut self, low: f32, high: f32) {
+        let between = Uniform::from(low..high);
         let mut rng = rand::thread_rng();
 
         for w in &mut self.weight {
@@ -77,9 +76,7 @@ impl Layer {
             // Dot product with input values
             let solution = Layer::sigmoid(self.weight.row(j).dot(input));
             self.result[[j + 1, batch]] = solution;
-            print!("{:.4}, ", solution);
         }
-        println!();
     }
 
     // Error functions
@@ -90,7 +87,6 @@ impl Layer {
                 let factor = target[batch] - input;
                 let error = Layer::sigmoid_derivative(input, factor);
                 self.error[[output, batch]] = error;
-                print!("{:.4}, ", error);
             }
         }
     }
@@ -104,7 +100,6 @@ impl Layer {
                 let input = self.result[[output + 1, batch]];
                 let error = Layer::sigmoid_derivative(input, factor);
                 self.error[[output, batch]] = error;
-                print!("{:.4}, ", error);
             }
         }
     }
@@ -134,11 +129,8 @@ impl Layer {
                 let delta = learning_rate * error;
                 let momentum = self.weight_last[[j, i]] * momentum_rate;
                 *weight += delta + momentum;
-                print!("{:.4} * {:.4} + {:.4} * {:.4} = ", learning_rate, error, momentum_rate, self.weight_last[[j, i]]);
-                println!("{:.4}", *weight);
                 self.weight_last[[j, i]] = delta + momentum;
             }
-            println!();
         }
     }
 }

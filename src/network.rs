@@ -1,9 +1,9 @@
 use ndarray::prelude::*;
-use crate::layer::*;
+use crate::{layer::*, print_data::*};
 
 pub struct Network {
     pub batch: usize,
-    pub batch_total: usize,
+    pub batch_size: usize,
     pub learning_rate: f32,
     pub momentum_rate: f32,
     // Stores all the layers of the network
@@ -19,15 +19,20 @@ impl Network {
 
         Network {
             batch: 0,
-            batch_total,
+            batch_size: batch_total,
             learning_rate,
             momentum_rate,
             layers,
         }
     }
-    pub fn set_weights(&mut self, weight: f32) {
+    pub fn _weight_set(&mut self, weight: f32) {
         for layer in &mut self.layers {
-            layer.set_weights(weight);
+            layer._weight_set(weight);
+        }
+    }
+    pub fn weight_randomize(&mut self, low: f32, high: f32) {
+        for layer in &mut self.layers {
+            layer.weight_randomize(low, high);
         }
     }
 
@@ -36,18 +41,33 @@ impl Network {
         let mut batch = 0;
         let mut total = 0;
         for i in input.0.rows() {
-            println!("=== BATCH: {}, INPUT: {}, TOTAL: {} ===", batch + 1, self.batch + 1, total + 1);
+            println!("=== BATCH: {}, INPUT: {}, TOTAL: {} ===", 
+                        batch + 1, self.batch + 1, total + 1);
+
             self.forward(&i);
-            
+            for layer in &self.layers {
+                _print_matrix(&layer.result, "RESULT");
+            }
             self.batch += 1;
             total += 1;
 
             // Do back propogation
-            if self.batch == self.batch_total {
-                let start = total - self.batch_total;
+            if self.batch == self.batch_size {
+                // For slicing the array over the bach.
+                let start = total - self.batch_size;
                 let end = total;
-                self.find_error(&input.1.slice(s![start..end]));
-                self.update_weights(&input.0.slice(s![start..end, ..]));
+
+                // Slice the arrays and classify targets
+                let target = &input.1.slice(s![start..end]);
+                let result = &self.layers.last().unwrap().result;
+                let target_class = Network::classify_targets(target, result, true);
+                let slice = &input.0.slice(s![start..end, ..]);
+
+                // Get the error and update the weights.
+                self.find_error(&target_class.view());
+                self.update_weights(slice);
+                
+                // Update counter variables.
                 self.batch = 0;
                 batch += 1;
             }
@@ -56,66 +76,78 @@ impl Network {
     }
 
     // Passes input into the chain of hidden layers until the final layer us used.
-    pub fn forward(&mut self, target: &ArrayView1<f32>) {
+    fn forward(&mut self, target: &ArrayView1<f32>) {
         let mut iter = self.layers.iter_mut();
         let mut layer_prev = iter.next().unwrap();
         let mut input;
 
         // Feed forward the initial input layer.
-        println!("Forward:\nInitial:");
         layer_prev.feed_forward(target, self.batch);
 
         // Feed it through every other layer.
         for layer in iter {
-            println!("Layer:");
             input = layer_prev.result.index_axis(Axis(1), self.batch);
             layer.feed_forward(&input, self.batch);
             layer_prev = layer;
         }
-        println!();
+    }
+
+    // Classify targets as either 0.9 or 0.1 for backprop.
+    fn classify_targets(target: &ArrayView1<f32>, result: &Array2<f32>, print: bool) -> Array1<f32> {
+        let mut out = Array1::<f32>::zeros(target.len());
+
+        // Cycle through all target values in batch.
+        for t in 0..target.len() {
+            // Look through each result given that batch and find the largest value.
+            let res = result.column(t);
+            let mut index: usize = 1;
+            for o in 2..res.len() {
+                if res[o] > res[index] {
+                    index = o;
+                }
+            }
+            index -= 1;
+            out[t] = if target[t] == index as f32 { 0.9 } else { 0.1 };
+            if print { 
+                print!("{} = {} ", target[t], index); 
+                //print!("w = {}, ", out[t]);
+            }
+        }
+        if print { println!("\n"); }
+        out
     }
 
     // Finds the error values given each output.
-    pub fn find_error(&mut self, target: &ArrayView1<f32>) {
+    fn find_error(&mut self, target: &ArrayView1<f32>) {
         let mut iter = self.layers.iter_mut().rev();
         let mut layer_prev = iter.next().unwrap();
 
         // Find error values for output layer.
-        println!("Error:\nOutput:");
         layer_prev.find_error_output(target);
-        println!();
 
         // Find error values for each inner layer.
         for layer in iter {
-            println!("Layer:");
             layer.find_error_layer(layer_prev);
             layer_prev = layer;
-            println!();
         }
-        println!();
     }
     
     // Updates the weights given the input batch and current error values.
-    pub fn update_weights(&mut self, input: &ArrayView2<f32>) {
+    fn update_weights(&mut self, input: &ArrayView2<f32>) {
         let mut iter = self.layers.iter_mut();
         let mut layer_prev = iter.next().unwrap();
 
         // Update the first layer using the input values.
-        println!("Update:\nInitial:");
         layer_prev.update_weights(
             input, true,
             self.learning_rate, self.momentum_rate);
 
         // Update the weights of every other layer.
         for layer in iter {
-            println!("Layer:");
             layer.update_weights(
                 &layer_prev.result.view(), false, 
                 self.learning_rate, self.momentum_rate);
             layer_prev = layer;
-            println!();
         }
-        println!();
     }
-    
 }
