@@ -8,6 +8,7 @@ pub struct Network {
     pub momentum_rate: f32,
     // Stores all the layers of the network
     pub layers: Array1<Layer>,
+    //pub confusion: Array2<u32>,
 }
 impl Network {
     pub fn new(sizes: &[LayerSize], learning_rate: f32, momentum_rate: f32, batch_total: usize) -> Network {
@@ -38,52 +39,47 @@ impl Network {
 
     // The main function for training the network.
     pub fn gradient_descent(&mut self, input: &(Array2<f32>, Array1<f32>)) {
-        let mut batch = 0;
         let mut total = 0;
         let mut correct: u32 = 0;
-        for i in input.0.rows() {
-            println!("=== BATCH: {}, INPUT: {}, TOTAL: {} ===", batch + 1, self.batch + 1, total + 1);
+        let len = input.0.len_of(Axis(0)) / self.batch_size;
+
+        // Go through all input vectors.
+        for i in 0..len {
+            println!("BATCH: {}, TOTAL: {}", i + 1, total);
 
             // Forward Propogation
-            self.forward(&i);
-            /* 
-            for layer in &self.layers {
-                _print_matrix(&layer.result, "RESULT");
+            // Go through the next n inputs as a batch.
+            for j in 0..self.batch_size {
+                total += 1;
+                self.batch = j;
+                self.forward(&input.0.row(i + j).view());
             }
-            */
-            self.batch += 1;
-            total += 1;
 
             // Backward propogation
-            if self.batch == self.batch_size {
-                // For slicing the array over the bach.
-                let start = total - self.batch_size;
-                let end = total;
+            // For slicing the array over the batch.
+            let start = total - self.batch_size;
+            let end = total;
 
-                // Slice the arrays and classify targets
-                let target = &input.1.slice(s![start..end]);
-                let result = &self.layers.last().unwrap().result;
-                let target_class = Network::classify_targets(target, result);
-                let slice = &input.0.slice(s![start..end, ..]);
+            // Slice the arrays and classify targets
+            let target = &input.1.slice(s![start..end]);
+            let result = &self.layers.last().unwrap().result;
+            let target_class = Network::classify_targets(target, result);
+            let slice = &input.0.slice(s![start..end, ..]);
 
-                _print_vector(target, "TARGET");
-                _print_vector(&target_class.1.view(), "PREDICT");
-
-                for t in 0..target.len() {
-                    if target[t] == target_class.1[t] {
-                        correct += 1;
-                    }
+            // Print all of the target and predicted values along with correct percentage
+            _print_vector(target, "TARGET");
+            _print_vector(&target_class.1.view(), "PREDICT");
+            for t in 0..target.len() {
+                if target[t] == target_class.1[t] {
+                    correct += 1;
                 }
-                _print_total_error(correct, total as u32);
-
-                // Get the error and update the weights.
-                self.find_error(&target_class.0.view());
-                self.update_weights(slice);
-                
-                // Update counter variables.
-                self.batch = 0;
-                batch += 1;
             }
+            _print_total_error(correct, total as u32);
+
+            // Get the error and update the weights.
+            self.find_error(&target_class.0.view());
+            self.update_weights(slice);
+            
             println!();
         }
     }
@@ -107,22 +103,27 @@ impl Network {
 
     // Classify targets as either 0.9 or 0.1 for backprop.
     fn classify_targets(target: &ArrayView1<f32>, result: &Array2<f32>) -> (Array1<f32>, Array1<f32>) {
-        let mut target_weight = Array1::<f32>::zeros(target.len());
-        let mut prediction = Array1::<f32>::zeros(target.len());
+        let len = target.len();
+        let mut target_weight = Array1::<f32>::zeros(len);
+        let mut prediction = Array1::<f32>::zeros(len);
 
         // Cycle through all target values in batch.
-        for t in 0..target.len() {
+        for t in 0..len {
             // Look through each result given that batch and find the largest value.
-            let res = result.column(t);
+            let res_col = result.column(t);
+            let r_len = res_col.len();
             let mut index: usize = 1;
-            for o in 2..res.len() {
-                if res[o] > res[index] {
+            for o in 1..r_len {
+                //print!("{:.3}, ", res_col[o]);
+                if res_col[o] > res_col[index] {
                     index = o;
                 }
             }
+            //println!();
             index -= 1;
-            target_weight[t] = if target[t] == index as f32 { 0.9 } else { 0.1 };
-            prediction[t] = index as f32;
+            let pre = index as f32;
+            target_weight[t] = if target[t] == pre { 0.9 } else { 0.1 };
+            prediction[t] = pre;
         }
         (target_weight, prediction)
     }

@@ -74,7 +74,8 @@ impl Layer {
         // Calculate result values.
         for j in 0..self.size.output {
             // Dot product with input values
-            let solution = Layer::sigmoid(self.weight.row(j).dot(input));
+            let dot_product = self.weight.row(j).dot(input);
+            let solution = Layer::sigmoid(dot_product);
             self.result[[j + 1, batch]] = solution;
         }
     }

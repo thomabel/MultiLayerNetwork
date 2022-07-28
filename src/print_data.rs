@@ -24,7 +24,7 @@ pub fn _print_matrix<T: std::fmt::Debug>(input: &ArrayView2<T>, name: &str) {
 pub fn _print_vector<T: std::fmt::Debug>(input: &ArrayView1<T>, name: &str) {
     println!("{}:", name);
     for i in input {
-        print!("{:?}, ", i);
+        print!("{:.0?}, ", i);
     }
     println!();
 }

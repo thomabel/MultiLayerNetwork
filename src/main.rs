@@ -40,6 +40,7 @@ fn main() {
         }
     }
     //_print_matrix(&input.0, "Input");
+    //println!("{}", input.0.dim().0);
     let _n = gradient_descent(&input);
     // Use network from here to test data.
 }
@@ -72,7 +73,12 @@ fn gradient_descent(input: &(Array2<f32>, Array1<f32>)) -> Network {
     let mut network = Network::new(&sizes, RATE, MOMENTUM, BATCHES);
     //network.weight_set(0.1);
     network.weight_randomize(LOW, HIGH);
-    network.gradient_descent(input);
+
+    for e in 0..EPOCH {
+        println!("===== EPOCH {} =====", e + 1);
+        network.gradient_descent(input);
+    }
+    
     println!("\nEnding training.");
     network
 }
