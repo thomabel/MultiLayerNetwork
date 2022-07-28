@@ -8,7 +8,7 @@ pub struct Network {
     pub momentum_rate: f32,
     // Stores all the layers of the network
     pub layers: Array1<Layer>,
-    //pub confusion: Array2<u32>,
+    pub confusion: Array2<u32>,
 }
 impl Network {
     pub fn new(sizes: &[LayerSize], learning_rate: f32, momentum_rate: f32, batch_total: usize) -> Network {
@@ -17,6 +17,8 @@ impl Network {
             temp.push(Layer::new(*size));
         }
         let layers = Array1::<Layer>::from_vec(temp);
+        let size = sizes.last().unwrap().output;
+        let confusion = Array2::<u32>::zeros((size, size));
 
         Network {
             batch: 0,
@@ -24,6 +26,7 @@ impl Network {
             learning_rate,
             momentum_rate,
             layers,
+            confusion,
         }
     }
     pub fn _weight_set(&mut self, weight: f32) {
@@ -64,13 +67,15 @@ impl Network {
             let target = &input.1.slice(s![start..end]);
             let result = &self.layers.last().unwrap().result;
             let target_class = Network::classify_targets(target, result);
-            let slice = &input.0.slice(s![start..end, ..]);
 
             // Print all of the target and predicted values along with correct percentage
             _print_vector(target, "TARGET");
             _print_vector(&target_class.1.view(), "PREDICT");
             for t in 0..target.len() {
-                if target[t] == target_class.1[t] {
+                let j = target[t] as usize;
+                let i = target_class.1[t] as usize;
+                self.confusion[[j, i]] += 1;
+                if j == i {
                     correct += 1;
                 }
             }
@@ -78,10 +83,11 @@ impl Network {
 
             // Get the error and update the weights.
             self.find_error(&target_class.0.view());
-            self.update_weights(slice);
+            self.update_weights(&input.0.slice(s![start..end, ..]));
             
             println!();
         }
+        _print_matrix(&self.confusion.view(), "CONFUSION");
     }
 
     // Passes input into the chain of hidden layers until the final layer us used.
