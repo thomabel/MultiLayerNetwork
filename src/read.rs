@@ -1,7 +1,7 @@
 use std::error::Error;
 use ndarray::prelude::*;
 
-pub fn read_toy (path: &str, inputs: usize) -> Result<(Array2<f32>, Array1<f32>), Box<dyn Error>> {
+pub fn read_csv (path: &str, inputs: usize) -> Result<(Array2<f32>, Array1<f32>), Box<dyn Error>> {
     let mut reader = csv::Reader::from_path(path)?;
     let mut output = Vec::new();
     let mut target = Vec::new();
@@ -19,6 +19,9 @@ pub fn read_toy (path: &str, inputs: usize) -> Result<(Array2<f32>, Array1<f32>)
                 return Err(Box::new(e));
             }
         }
+        
+        // Add Bias first.
+        output.push(1.);
         // Parse each entry in the input.
         for i in 1..=inputs {
             let num = record[i].parse::<f32>();
@@ -31,11 +34,12 @@ pub fn read_toy (path: &str, inputs: usize) -> Result<(Array2<f32>, Array1<f32>)
                 }
             }
         }
+    
         nrow += 1;
     }
 
     let out_array 
-        = Array2::from_shape_vec((nrow, inputs), output)?;
+        = Array2::from_shape_vec((nrow, inputs + 1), output)?;
     let target_array
         = Array1::from_vec(target);
     Ok((out_array, target_array))

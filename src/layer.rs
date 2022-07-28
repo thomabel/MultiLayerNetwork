@@ -3,21 +3,20 @@ use ndarray_rand::rand_distr::Distribution;
 use rand::distributions::Uniform;
 use crate::constants::*;
 
+#[derive(Clone, Copy)]
 pub struct LayerSize {
-    pub outputs: usize,
-    pub inputs: usize,
-    pub batches: usize,
+    pub output: usize,
+    pub input: usize,
+    pub batch: usize,
 }
 impl LayerSize {
     pub fn new(o: usize, i:usize, b: usize) -> LayerSize{
-        LayerSize { outputs: o, inputs: i, batches: b }
+        LayerSize { output: o, input: i, batch: b }
     }
 }
 
 pub struct Layer {
-    pub outputs:     usize,
-    pub inputs:      usize,
-    pub batches:     usize,
+    pub size:       LayerSize,
     pub weight:      Array2<f32>,
     pub weight_last: Array2<f32>,
     pub result:      Array2<f32>,
@@ -25,20 +24,22 @@ pub struct Layer {
 }
 impl Layer {
     // Constructors
-    pub fn new(size: &LayerSize) -> Layer {
+    pub fn new(size: LayerSize) -> Layer {
+        // The weight between the output nodes and their inputs.
         let weight 
-            = Array2::<f32>::zeros((size.outputs, size.inputs));
+            = Array2::<f32>::zeros((size.output, size.input + 1));
+        // For storing the last used weight delta for momentum term.
         let weight_last 
-            = Array2::<f32>::zeros((size.outputs, size.inputs));
+            = Array2::<f32>::zeros((size.output, size.input + 1));
+        // Stores the results of forward propogation. Add 1 to row for bias input on next layer.
         let result 
-            = Array2::<f32>::zeros((size.outputs, size.batches));
+            = Array2::<f32>::zeros((size.output + 1, size.batch));
+        // Stores the error value for back propogation.
         let error
-            = Array2::<f32>::zeros((size.outputs, size.batches));
+            = Array2::<f32>::zeros((size.output, size.batch));
         
         Layer{ 
-            outputs: size.outputs, 
-            inputs: size.inputs, 
-            batches: size.batches,
+            size,
             weight, 
             weight_last, 
             result, 
@@ -69,47 +70,41 @@ impl Layer {
 
     // Finds all results for this layer given an input vector.
     pub fn feed_forward(&mut self, input: &ArrayView1<f32>, batch: usize) {
-        let len = self.inputs - 1;
-        // For each output node
-        for j in 0..self.outputs {
+        // Set Bias as first term for next layer.
+        self.result[[0, batch]] = 1.;
+        // Calculate result values.
+        for j in 0..self.size.output {
             // Dot product with input values
-            let mut solution: f32 = 0.0;
-            for i in 0..len {
-                let wi = self.weight[[j, i]] * input[i];
-                solution += wi;
-            }
-            // Bias
-            solution += self.weight[[j, len]];
-            // use sigmoid
-            solution = Layer::sigmoid(solution);
-            self.result[[j, batch]] = solution;
-            print!("{:.3}, ", solution);
+            let solution = Layer::sigmoid(self.weight.row(j).dot(input));
+            self.result[[j + 1, batch]] = solution;
+            print!("{:.4}, ", solution);
         }
         println!();
     }
 
     // Error functions
     pub fn find_error_output(&mut self, target: &ArrayView1<f32>) {
-        for node in 0..self.outputs {     
-            for batch in 0..self.batches {
-                let input = self.result[[node, batch]];
+        for output in 0..self.size.output {     
+            for batch in 0..self.size.batch {
+                let input = self.result[[output + 1, batch]];
                 let factor = target[batch] - input;
                 let error = Layer::sigmoid_derivative(input, factor);
-                self.error[[node, batch]] = error;
-                print!("{:.3}, ", error);
+                self.error[[output, batch]] = error;
+                print!("{:.4}, ", error);
             }
         }
     }
     pub fn find_error_layer(&mut self, layer_prev: &Layer) {
-        for hidden in 0..self.outputs {
-            for batch in 0..self.batches {
-                let input = self.result[[hidden, batch]];
-                let col_w = &layer_prev.weight.column(hidden);
+        for output in 0..self.size.output {
+            for batch in 0..self.size.batch {
+                let col_w = &layer_prev.weight.column(output);
                 let col_e = &layer_prev.error.column(batch);
                 let factor = col_w.dot(col_e);
+
+                let input = self.result[[output + 1, batch]];
                 let error = Layer::sigmoid_derivative(input, factor);
-                self.error[[hidden, batch]] = error;
-                print!("{:.3}, ", error);
+                self.error[[output, batch]] = error;
+                print!("{:.4}, ", error);
             }
         }
     }
@@ -122,20 +117,17 @@ impl Layer {
         learning_rate: f32, 
         momentum_rate: f32
     ) {
-        let batch_size = self.batches as f32;
-        let index = self.inputs - 1;
+        let batch_size = self.size.batch as f32;
 
-        for j in 0..self.outputs {
+        for j in 0..self.size.output {
             let row_e = self.error.row(j);
             
-            for i in 0..index {
-                let row_i;
-                if read_column {
-                    row_i = input.column(i);
-                }
-                else {
-                    row_i = input.row(i);
-                }
+            for i in 0..=self.size.input {
+                // Use column or row depending on if input is original or layer.
+                let row_i =
+                if read_column { input.column(i) }
+                else { input.row(i) };
+
                 // Weight update
                 let weight = &mut self.weight[[j, i]];
                 let error = row_i.dot(&row_e) / batch_size;
@@ -143,18 +135,10 @@ impl Layer {
                 let momentum = self.weight_last[[j, i]] * momentum_rate;
                 *weight += delta + momentum;
                 print!("{:.4} * {:.4} + {:.4} * {:.4} = ", learning_rate, error, momentum_rate, self.weight_last[[j, i]]);
-                println!("{:.4}, ", *weight);
+                println!("{:.4}", *weight);
+                self.weight_last[[j, i]] = delta + momentum;
             }
-
-            // Bias weight update
-            let weight = &mut self.weight[[j, index]];
-            let delta = learning_rate * row_e.sum() / batch_size;
-            let momentum = self.weight_last[[j, index]];
-            *weight += delta + momentum;
-            print!("{:.4}, ", *weight);
-
             println!();
         }
-        println!();
     }
 }

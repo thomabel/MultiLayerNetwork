@@ -7,18 +7,27 @@
     Class: Machine Learning
 */
 mod constants;
+mod read;
 mod layer;
 mod network;
 mod print_data;
-mod read;
 
 use constants::*;
 use ndarray::prelude::*;
+use network::Network;
 
 
 // MAIN
 fn main() {
-    let result = read_toy_input();
+    let path_index = 0;
+    let path = [
+        "./data/test.csv",
+        "./data/mnist_test - Copy.csv",
+        "./data/mnist_test_short.csv",
+        "./data/mnist_train.csv",
+        "./data/mnist_test.csv",
+    ];
+    let result = read_file(path[path_index]);
     let input;
     match result {
         Ok(o) => {
@@ -29,14 +38,16 @@ fn main() {
             return;
         }
     }
-    gradient_descent(&input);
+    let _n = gradient_descent(&input);
+    // Use network from here to test data.
 }
 
-fn read_toy_input() -> Result<(Array2<f32>, Array1<f32>), &'static str> {
-    // Read file for data.
+// Reads from a .csv file to get input values.
+fn read_file(path: &str) -> Result<(Array2<f32>, Array1<f32>), &'static str> {
     println!("Reading data, please be patient...");
-    let path = "./data/test.csv";
-    let input = read::read_toy(path, 2);
+    let inputs = INPUT;
+    let input 
+        = read::read_csv(path, inputs);
     match input {
         Ok(v) => {
             println!("SUCCESS: Data read");
@@ -49,64 +60,16 @@ fn read_toy_input() -> Result<(Array2<f32>, Array1<f32>), &'static str> {
     }
 }
 
-/* fn read_image_input() -> Result<Array1<Input>, &'static str> {
-    // Read file for data.
-    println!("Reading data, please be patient...");
-    let path_index = 1;
-    let path = [
-        "./data/mnist_test - Copy.csv",
-        "./data/mnist_test_short.csv",
-        "./data/mnist_train.csv",
-        "./data/mnist_test.csv",
-    ];
-    let inputs = INPUT;
-    let dividend = DIVIDE;
-    let temp
-        = read::read_image(path[path_index], inputs, dividend);
-
-    match temp {
-        Ok(v) => {
-            println!("SUCCESS: Data read");
-            Ok(Array1::<Input>::from_vec(v))
-        }
-        Err(_e) => {
-            let str = "Could not read.";
-            Err(str)
-        }
-    }
-}
-*/
-
-
-fn gradient_descent(input: &(Array2<f32>, Array1<f32>)) {
+// Performs training on the network.
+fn gradient_descent(input: &(Array2<f32>, Array1<f32>)) -> Network {
     println!("Performing gradient descent... \n");
-    // Goes Output, Input
-    // Add +1 on input for bias at the end
-    // Currently on 2 layers
     let sizes = vec![
-        layer::LayerSize::new(HIDDEN, INPUT + 1, BATCHES),
-        layer::LayerSize::new(OUTPUT, HIDDEN + 1, BATCHES)
+        layer::LayerSize::new(HIDDEN, INPUT, BATCHES),
+        layer::LayerSize::new(OUTPUT, HIDDEN, BATCHES)
     ];
-    let mut network = network::Network::new(&sizes, RATE, MOMENTUM);
+    let mut network = Network::new(&sizes, RATE, MOMENTUM, BATCHES);
     network.set_weights(0.1);
-
-    let mut total = 0;
-    for i in input.0.rows() {
-        total += 1;
-        println!("=== BATCH: {}, INPUT: {} ===", network.batch, total);
-        network.forward(&i);
-
-        network.batch += 1;
-        if network.batch == BATCHES {
-            // Do backprop
-            let start = total - BATCHES;
-            let end = total;
-            network.find_error(&input.1.slice(s![start..end]));
-            network.update_weights(&input.0.slice(s![start..end, ..]));
-            network.batch = 0;
-        }
-        println!();
-    }
-
+    network.gradient_descent(input);
     println!("\nEnding training.");
+    network
 }
