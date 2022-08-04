@@ -2,31 +2,20 @@ use ndarray::prelude::*;
 use crate::{layer::*, print_data::*};
 
 pub struct Network {
-    pub batch: usize,
-    pub batch_size: usize,
-    pub learning_rate: f32,
-    pub momentum_rate: f32,
-    // Stores all the layers of the network
-    pub layers: Array1<Layer>,
-    pub confusion: Array2<u32>,
+    layers: Array1<Layer>,
+    batch_size: usize,
 }
 impl Network {
-    pub fn new(sizes: &[LayerSize], learning_rate: f32, momentum_rate: f32, batch_total: usize) -> Network {
+    pub fn new(sizes: &[LayerSize], batch_total: usize) -> Network {
         let mut temp = Vec::<Layer>::new();
         for size in sizes {
             temp.push(Layer::new(*size));
         }
         let layers = Array1::<Layer>::from_vec(temp);
-        let size = sizes.last().unwrap().output;
-        let confusion = Array2::<u32>::zeros((size, size));
 
         Network {
-            batch: 0,
             batch_size: batch_total,
-            learning_rate,
-            momentum_rate,
             layers,
-            confusion,
         }
     }
     pub fn _weight_set(&mut self, weight: f32) {
@@ -41,21 +30,31 @@ impl Network {
     }
 
     // The main function for training the network.
-    pub fn gradient_descent(&mut self, input: &(Array2<f32>, Array1<f32>)) {
+    pub fn gradient_descent(
+        &mut self, 
+        input: &(Array2<f32>, Array1<f32>), 
+        learning_rate: f32, 
+        momentum_rate: f32
+    ) -> Array2<u32>
+    {
+        let batch_total = input.0.len_of(Axis(0)) / self.batch_size;
+        let confusion_size = self.layers.last().unwrap().size.output;
+        let mut confusion = Array2::<u32>::zeros((confusion_size, confusion_size));
         let mut total = 0;
         let mut correct: u32 = 0;
-        let len = input.0.len_of(Axis(0)) / self.batch_size;
 
-        // Go through all input vectors.
-        for i in 0..len {
+        // Loops for each batch.
+        for i in 0..batch_total {
             println!("BATCH: {}, TOTAL: {}", i + 1, total);
 
             // Forward Propogation
             // Go through the next n inputs as a batch.
             for j in 0..self.batch_size {
+                let index = i + j;
+                self.forward( 
+                    &input.0.row(index).view(), 
+                    j);
                 total += 1;
-                self.batch = j;
-                self.forward(&input.0.row(i + j).view());
             }
 
             // Backward propogation
@@ -69,46 +68,51 @@ impl Network {
             let target_class = Network::classify_targets(target, result);
 
             // Print all of the target and predicted values along with correct percentage
-            _print_vector(target, "TARGET");
-            _print_vector(&target_class.1.view(), "PREDICT");
             for t in 0..target.len() {
                 let j = target[t] as usize;
                 let i = target_class.1[t] as usize;
-                self.confusion[[j, i]] += 1;
+                confusion[[j, i]] += 1;
                 if j == i {
                     correct += 1;
                 }
             }
+            _print_vector(target, "TARGET");
+            _print_vector(&target_class.1.view(), "PREDICT");
             _print_total_error(correct, total as u32);
 
             // Get the error and update the weights.
-            self.find_error(&target_class.0.view());
-            self.update_weights(&input.0.slice(s![start..end, ..]));
-            
-            println!();
+            self.find_error(
+                &target_class.0.view()
+            );
+            self.update_weights(
+                &input.0.slice(s![start..end, ..]), 
+                learning_rate, 
+                momentum_rate,
+            );
         }
-        _print_matrix(&self.confusion.view(), "CONFUSION");
+        confusion
     }
 
     // Passes input into the chain of hidden layers until the final layer us used.
-    fn forward(&mut self, target: &ArrayView1<f32>) {
+    fn forward(&mut self, target: &ArrayView1<f32>, batch: usize){
         let mut iter = self.layers.iter_mut();
         let mut layer_prev = iter.next().unwrap();
         let mut input;
 
         // Feed forward the initial input layer.
-        layer_prev.feed_forward(target, self.batch);
+        layer_prev.feed_forward(target, batch);
 
         // Feed it through every other layer.
         for layer in iter {
-            input = layer_prev.result.index_axis(Axis(1), self.batch);
-            layer.feed_forward(&input, self.batch);
+            input = layer_prev.result.index_axis(Axis(1), batch);
+            layer.feed_forward(&input, batch);
             layer_prev = layer;
         }
     }
 
     // Classify targets as either 0.9 or 0.1 for backprop.
-    fn classify_targets(target: &ArrayView1<f32>, result: &Array2<f32>) -> (Array1<f32>, Array1<f32>) {
+    fn classify_targets(target: &ArrayView1<f32>, result: &Array2<f32>) 
+        -> (Array1<f32>, Array1<f32>){
         let len = target.len();
         let mut target_weight = Array1::<f32>::zeros(len);
         let mut prediction = Array1::<f32>::zeros(len);
@@ -150,21 +154,27 @@ impl Network {
     }
     
     // Updates the weights given the input batch and current error values.
-    fn update_weights(&mut self, input: &ArrayView2<f32>) {
+    fn update_weights(
+        &mut self,
+        input: &ArrayView2<f32>,
+        learning_rate: f32,
+        momentum_rate: f32,
+    ){
         let mut iter = self.layers.iter_mut();
         let mut layer_prev = iter.next().unwrap();
 
         // Update the first layer using the input values.
         layer_prev.update_weights(
             input, true,
-            self.learning_rate, self.momentum_rate);
+            learning_rate, momentum_rate);
 
         // Update the weights of every other layer.
         for layer in iter {
             layer.update_weights(
                 &layer_prev.result.view(), false, 
-                self.learning_rate, self.momentum_rate);
+                learning_rate, momentum_rate);
             layer_prev = layer;
         }
     }
+
 }

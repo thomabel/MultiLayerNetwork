@@ -15,11 +15,14 @@ mod print_data;
 use constants::*;
 use ndarray::prelude::*;
 use network::Network;
+use rand::seq::SliceRandom;
+
+use crate::print_data::{_print_matrix, _print_correct};
 
 
 // MAIN
 fn main() {
-    let path_index = 2;
+    let path_index = 4;
     let path = [
         "./data/test.csv",
         "./data/mnist_test - Copy.csv",
@@ -27,7 +30,8 @@ fn main() {
         "./data/mnist_train.csv",
         "./data/mnist_test.csv",
     ];
-    let result = read_file(path[path_index]);
+    println!("Reading data, please be patient...");
+    let result = read::read_csv(path[path_index], INPUT);
     let input;
     match result {
         Ok(mut o) => {
@@ -39,46 +43,45 @@ fn main() {
             return;
         }
     }
-    //_print_matrix(&input.0, "Input");
-    //println!("{}", input.0.dim().0);
-    let _n = gradient_descent(&input);
-    // Use network from here to test data.
-}
 
-// Reads from a .csv file to get input values.
-fn read_file(path: &str) -> Result<(Array2<f32>, Array1<f32>), &'static str> {
-    println!("Reading data, please be patient...");
-    let inputs = INPUT;
-    let input 
-        = read::read_csv(path, inputs);
-    match input {
-        Ok(v) => {
-            println!("SUCCESS: Data read");
-            Ok(v)
-        }
-        Err(_e) => {
-            let str = "Could not read.";
-            Err(str)
-        }
-    }
+    let _n = train_network(&input);
+
 }
 
 // Performs training on the network.
-fn gradient_descent(input: &(Array2<f32>, Array1<f32>)) -> Network {
+fn train_network(input: &(Array2<f32>, Array1<f32>)) -> Network {
     println!("Performing gradient descent... \n");
-    let sizes = vec![
-        layer::LayerSize::new(HIDDEN, INPUT, BATCHES),
-        layer::LayerSize::new(OUTPUT, HIDDEN, BATCHES)
-    ];
-    let mut network = Network::new(&sizes, RATE, MOMENTUM, BATCHES);
-    //network.weight_set(0.1);
-    network.weight_randomize(LOW, HIGH);
 
+    // Create the network.
+    let sizes = vec![
+        layer::LayerSize::new(HIDDEN, INPUT, BATCH_SIZE),
+        layer::LayerSize::new(OUTPUT, HIDDEN, BATCH_SIZE)
+    ];
+    let mut network = Network::new(&sizes, BATCH_SIZE);
+    network.weight_randomize(WEIGHT_LOW, WEIGHT_HIGH);
+
+    // Train the network.
     for e in 0..EPOCH {
+        // Create index array for randomization of inputs.
+        //let index_vec = random_index(input.1.len());
+
+        // Perform the algorithm with all training input data.
         println!("===== EPOCH {} =====", e + 1);
-        network.gradient_descent(input);
+        let confusion = network.gradient_descent(input, LEARNING_RATE, MOMENTUM_RATE);
+        _print_matrix(&confusion.view(), "CONFUSION");
+        _print_correct(&confusion.view());
     }
     
     println!("\nEnding training.");
     network
+}
+
+// Creates a vector of indices and shuffles them.
+fn random_index(size: usize) -> Vec<usize> {
+    let mut vec = Vec::new();
+    for i in 0..size {
+        vec.push(i);
+    }
+    vec.shuffle(&mut rand::thread_rng());
+    vec
 }

@@ -15,11 +15,12 @@ impl LayerSize {
 }
 
 pub struct Layer {
-    pub size:        LayerSize,         // Sizes
-    pub weight:      Array2<f32>,       // [output, input + 1]
-    pub weight_last: Array2<f32>,       // [output, input + 1]
-    pub result:      Array2<f32>,       // [output + 1, batch]
-    pub error:       Array2<f32>,       // [output, batch]
+    pub result:  Array2<f32>,       // [output + 1, batch]
+    pub size:    LayerSize,         // Sizes
+    
+    weight:      Array2<f32>,       // [output, input + 1]
+    weight_last: Array2<f32>,       // [output, input + 1]
+    error:       Array2<f32>,       // [output, batch]
 }
 impl Layer {
     // Constructors
@@ -75,8 +76,7 @@ impl Layer {
         for j in 0..self.size.output {
             // Dot product with input values
             let dot_product = self.weight.row(j).dot(input);
-            let solution = Layer::sigmoid(dot_product);
-            self.result[[j + 1, batch]] = solution;
+            self.result[[j + 1, batch]] = Layer::sigmoid(dot_product);
         }
     }
 
@@ -86,8 +86,7 @@ impl Layer {
             for batch in 0..self.size.batch {
                 let input = self.result[[output + 1, batch]];
                 let factor = target[batch] - input;
-                let error = Layer::sigmoid_derivative(input, factor);
-                self.error[[output, batch]] = error;
+                self.error[[output, batch]] = Layer::sigmoid_derivative(input, factor);
             }
         }
     }
@@ -99,8 +98,7 @@ impl Layer {
                 let factor = col_w.dot(col_e);
 
                 let input = self.result[[output + 1, batch]];
-                let error = Layer::sigmoid_derivative(input, factor);
-                self.error[[output, batch]] = error;
+                self.error[[output, batch]] = Layer::sigmoid_derivative(input, factor);
             }
         }
     }
@@ -121,16 +119,15 @@ impl Layer {
             for i in 0..=self.size.input {
                 // Use column or row depending on if input is original or layer.
                 let row_i =
-                if read_column { input.column(i) }
-                else { input.row(i) };
+                    if read_column  { input.column(i) }
+                    else            { input.row(i) };
 
                 // Weight update
-                let weight = &mut self.weight[[j, i]];
-                let error = row_i.dot(&row_e) / batch_size;
-                let delta = learning_rate * error;
-                let momentum = self.weight_last[[j, i]] * momentum_rate;
-                *weight += delta + momentum;
-                self.weight_last[[j, i]] = delta + momentum;
+                let delta = learning_rate * row_i.dot(&row_e) / batch_size 
+                    + self.weight_last[[j, i]] * momentum_rate;
+
+                self.weight[[j, i]] += delta;
+                self.weight_last[[j, i]] = delta;
             }
         }
     }

@@ -28,3 +28,10 @@ pub fn _print_vector<T: std::fmt::Debug>(input: &ArrayView1<T>, name: &str) {
     }
     println!();
 }
+
+pub fn _print_correct(input: &ArrayView2<u32>) {
+    let diag = input.diag();
+    let correct = diag.sum();
+    let total = input.sum();
+    _print_total_error(correct, total);
+}
